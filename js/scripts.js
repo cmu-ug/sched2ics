@@ -18,6 +18,8 @@ const DISPLAY_NAME_AND_CODE = 1;
 const DISPLAY_NAME_ONLY = 2;
 const DISPLAY_CODE_AND_SECTION = 3;
 
+const SOC_JSON = 'data/courses.json';
+
 function fetchFirstDays(startDate, startTime) {
   var firstDays = {};
   var days = 'UMTWRFS';
@@ -73,6 +75,11 @@ function repeatWeeklyWithBreaks(startDate, date) {
 
   // init modals
   M.Modal.init(document.querySelectorAll('.modal'));
+
+  // init forms
+  setTimeout(function() {
+    M.FormSelect.init(document.querySelectorAll('select'));
+  }, 100);
 
   // initialize the vue app
   var mainApp = new Vue({
@@ -131,23 +138,38 @@ function repeatWeeklyWithBreaks(startDate, date) {
           idr: 'r' + course,
           pickl: firstL,
           pickr: firstR,
+          units: courseData[course][0].units
         });
-      },
-      noop: function() {}
+      }
     }
   });
 
   var settingsApp = new Vue({
     el: '#settingsApp',
     data: {
+      alarmsRaw: "",
+      alarmsTimeout: null,
       settings: {
         alarms: [600], // 600 seconds = 10 minutes before
         period_start: SEMESTER_START,
         period_end: SEMESTER_END,
         displayStyle: DISPLAY_CODE_AND_SECTION,
+        socLocation: SOC_JSON
       }
-    }, methods: {}
+    }, methods: {
+      updateRawAlarms: function() {
+        if (this.alarmsTimeout) {
+          clearTimeout(this.alarmsTimeout);
+        }
+        this.alarmsTimeout = setTimeout(function() {
+          this.settings.alarms = this.alarmsRaw.split(",").map((itm) => {
+            return parseInt(itm, 10);
+          });
+        }.bind(this), 100);
+      }
+    }
   });
+  settingsApp.alarmsRaw = settingsApp.settings.alarms.join(",");
 
   var addEventToCalendar = function(calendar, courseInfo, sectionName, sectionInfo) {
     var eventTitle;
@@ -208,25 +230,29 @@ function repeatWeeklyWithBreaks(startDate, date) {
   });
 
   // fetch the course json
-  fetch('data/courses.json').then(function (response) {
-    if (response.status !== 200) {
-      M.toast({html: 'Error fetching course JSON: ' + response.status});
-      return;
-    }
-
-    // Examine the text in the response
-    response.json().then(function(data) {
-      courseData = data;
-      var courseArray = [];
-      for (var courseNum in courseData) {
-        courseArray.push(courseNum);
+  var updateSoc = function() {
+    fetch(settingsApp.settings.socLocation).then(function(resp) {
+      if (resp.status !== 200) {
+        M.toast({html: 'Error fetching course JSON: ' + resp.status});
+        return;
       }
-      // Set up autocomplete
-      autocomplete(courseInput, courseArray, mainApp.addCourse);
+
+      // convert to json
+      resp.json().then(function(data) {
+        courseData = data;
+        var courseArray = [];
+        for (var courseNum in courseData) {
+          courseArray.push(courseNum);
+        }
+        // Set up autocomplete
+        autocomplete(courseInput, courseArray, mainApp.addCourse);
+      });
+    }).catch(function(err) {
+      M.toast({html: 'Error fetching course JSON: ' + err});
     });
-  }).catch(function(err) {
-    M.toast({html: 'Error fetching course JSON: ' + err});
-  });
+  };
+
+  updateSoc();
 
   // debug
   this.mainApp = mainApp;

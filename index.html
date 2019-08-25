@@ -24,7 +24,9 @@
       <h2 class="header center orange-text" v-if="courses.length > 0">Current Courses</h2>
       <div class="card" v-for="course,idx in courses">
         <div class="card-content">
-          <span class="card-title">{{course.id}} - {{course.title}}</span>
+          <div class="card-title" style="display: flex;">
+            <div>{{course.id}} -&nbsp;</div>
+            <input type="text" class="card-editable browser-default" v-model="course.title"></div>
           <div class="row">
             <div class="col s6" v-if="course.hasLectures">
               <b>Lectures</b>
@@ -58,7 +60,7 @@
           </div>
         </div>
         <div class="card-action">
-          <a class="red-text pointer-cursor" v-on:click="courses.splice(idx, 1)">Remove</a>
+          <a class="red-text pointer-cursor" v-on:click="courses.splice(idx, 1);recomputeUnits()">Remove</a>
         </div>
       </div>
     </div>
@@ -75,13 +77,27 @@
           </ol>
         </div>
       </div>
+      <br />
+      <h3 class="header center orange-text">Why use this tool</h3>
+      <div class="row">
+        <div class="col s12">
+          <ol>
+            <li>Set alarms/notifications for classes whenever you want</li>
+            <li>Each session is its own event (this is sometimes more useful and sometimes not)</li>
+            <li>Rename calendar events</li>
+            <li>fun</li>
+          </ol>
+        </div>
+      </div>
+      <br />
+      <br />
+      <div class="row">
+        <h4 class="header center orange-text">Screenshots</h4>
+        <br />
+        <img src="data/screenshot.png" class="col s12" />
+      </div>
     </div>
   </div>
-  <br />
-  <br />
-  <br />
-  <br />
-  <br />
   <br />
   <br />
   <br />
@@ -115,7 +131,40 @@
     <div class="modal-content">
       <h4>Settings</h4>
       <div id="settingsApp">
-        {{ settings.period_start }}
+        <div class="row">
+          <div class="col s12">
+            Advanced customization options available here:
+          </div>
+        </div>
+        <div class="row">
+          <div class="input-field col s12">
+            <select class="orange-text">
+              <option value="1" selected>Fall 2019 entire</option>
+              <option value="2">Fall 2019 first half</option>
+              <option value="3">Fall 2019 second half</option>
+            </select>
+            <label>Mini-semester</label>
+          </div>
+          <div class="input-field col s12">
+            <select class="orange-text" v-model.number="settings.displayStyle">
+              <option class="orange-text" value="0" selected>Code only</option>
+              <option class="orange-text" value="1">Code and name</option>
+              <option class="orange-text" value="2">Name only</option>
+              <option class="orange-text" value="3">Code and section</option>
+            </select>
+            <label>Calendar event title</label>
+          </div>
+          <div class="input-field col s12">
+            <input id="alarms" type="text" v-model="alarmsRaw" @change="updateRawAlarms()">
+            <label for="alarms">Alarms</label>
+            <span class="helper-text">Comma-separated values for seconds before class to trigger a notification.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col s12">
+            {{ settings.period_start }}
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
