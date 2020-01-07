@@ -17,6 +17,7 @@ const DISPLAY_CODE_ONLY = 0;
 const DISPLAY_NAME_AND_CODE = 1;
 const DISPLAY_NAME_ONLY = 2;
 const DISPLAY_CODE_AND_SECTION = 3;
+const DISPLAY_NAME_AND_SECTION = 4;
 
 const SOC_JSON = 'data/courses.json';
 
@@ -180,6 +181,7 @@ function repeatWeeklyWithBreaks(startDate, date) {
     case DISPLAY_NAME_AND_CODE: eventTitle = courseInfo.id + ' - ' + courseInfo.title; break;
     case DISPLAY_NAME_ONLY: eventTitle = courseInfo.title; break;
     case DISPLAY_CODE_AND_SECTION: eventTitle = courseInfo.id + ' ' + sectionName; break;
+    case DISPLAY_NAME_AND_SECTION: eventTitle = courseInfo.title + ' ' + sectionName; break;
     }
     for (var i = 0; i < sectionInfo.days.length; i++) {
       var day = sectionInfo.days[i];
