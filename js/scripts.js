@@ -1,16 +1,20 @@
 /* global Vue, node_cal, M, fetch, moment */
 // TODO: consider a better way for searching
 
-const SEMESTER = 'Fall 2019';
-const SEMESTER_START = new Date(2019, 7, 25); // august = 7
-const SEMESTER_HALF_END = new Date(2019, 9, 18); // october = 9
-const SEMESTER_END = new Date(2019, 11, 6); // december = 11
+const SEMESTER = 'Spring 2020';
+const SEMESTER_START = new Date(2020, 0, 13); // january = 0
+const SEMESTER_HALF_END = new Date(2020, 2, 2); // march = 2
+const SEMESTER_END = new Date(2020, 4, 1); // may = 4
 const SEMESTER_BREAKS = [ // ... vice versa for all dates
-  new Date(2019, 8, 2),
-  new Date(2019, 9, 18),
-  new Date(2019, 10, 27),
-  new Date(2019, 10, 28),
-  new Date(2019, 10, 29),
+  new Date(2020, 0, 20),
+  new Date(2020, 2, 6),
+  new Date(2020, 2, 9),
+  new Date(2020, 2, 10),
+  new Date(2020, 2, 11),
+  new Date(2020, 2, 12),
+  new Date(2020, 2, 13),
+  new Date(2020, 3, 16),
+  new Date(2020, 3, 17),
 ];
 
 const DISPLAY_CODE_ONLY = 0;
