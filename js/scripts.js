@@ -1,20 +1,18 @@
 /* global Vue, node_cal, M, fetch, moment */
 // TODO: consider a better way for searching
 
-const SEMESTER = 'Spring 2020';
-const SEMESTER_START = new Date(2020, 0, 13); // january = 0
-const SEMESTER_HALF_END = new Date(2020, 2, 2); // march = 2
-const SEMESTER_END = new Date(2020, 4, 1); // may = 4
+const SEMESTER = 'Fall 2020';
+const SEMESTER_START = new Date(2020, 7, 31); // january = 0
+const SEMESTER_HALF_END = new Date(2020, 9, 19); // march = 2
+const SEMESTER_HALF_START = new Date(2020, 9, 26);
+const SEMESTER_END = new Date(2020, 11, 11); // may = 4
 const SEMESTER_BREAKS = [ // ... vice versa for all dates
-  new Date(2020, 0, 20),
-  new Date(2020, 2, 6),
-  new Date(2020, 2, 9),
-  new Date(2020, 2, 10),
-  new Date(2020, 2, 11),
-  new Date(2020, 2, 12),
-  new Date(2020, 2, 13),
-  new Date(2020, 3, 16),
-  new Date(2020, 3, 17),
+  new Date(2020, 8, 7),
+  new Date(2020, 9, 16),
+  new Date(2020, 9, 23),
+  new Date(2020, 10, 25),
+  new Date(2020, 10, 26),
+  new Date(2020, 10, 27),
 ];
 
 const DISPLAY_CODE_ONLY = 0;
@@ -40,6 +38,16 @@ function fetchFirstDays(startDate, startTime) {
   }
 
   return firstDays;
+}
+
+function countKeys(obj) {
+  var i = 0;
+  for (var key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      i += 1;
+    }
+  }
+  return i;
 }
 
 function downloadString(mimeType, fileName, data) {
@@ -90,7 +98,8 @@ function repeatWeeklyWithBreaks(startDate, date) {
   var mainApp = new Vue({
     el: '#mainApp',
     data: {
-      courses: []
+      courses: [],
+      semester_name: SEMESTER
     }, methods: {
       addCourse: function(course) {
         courseInput.value = '';
@@ -157,7 +166,10 @@ function repeatWeeklyWithBreaks(startDate, date) {
       settings: {
         alarms: [600], // 600 seconds = 10 minutes before
         period_start: SEMESTER_START,
+        period_half_end: SEMESTER_HALF_END,
+        period_half_start: SEMESTER_HALF_START,
         period_end: SEMESTER_END,
+        hideExtraneousSectionCode: true,
         displayStyle: DISPLAY_CODE_AND_SECTION,
         socLocation: SOC_JSON
       }
@@ -176,27 +188,45 @@ function repeatWeeklyWithBreaks(startDate, date) {
   });
   settingsApp.alarmsRaw = settingsApp.settings.alarms.join(",");
 
-  var addEventToCalendar = function(calendar, courseInfo, sectionName, sectionInfo) {
+  var addEventToCalendar = function(calendar, courseInfo, sectionName, sectionInfo, skipSectionName) {
     var eventTitle;
-    var firstDays = fetchFirstDays(settingsApp.settings.period_start, sectionInfo.begin);
+    var firstDaysFull = fetchFirstDays(settingsApp.settings.period_start, sectionInfo.begin);
+    var firstDaysHalf = fetchFirstDays(SEMESTER_HALF_START, sectionInfo.begin);
 
+    /* do the padding for sectionName here since it might be blank */
     switch (settingsApp.settings.displayStyle) {
     case DISPLAY_CODE_ONLY: eventTitle = courseInfo.id; break;
     case DISPLAY_NAME_AND_CODE: eventTitle = courseInfo.id + ' - ' + courseInfo.title; break;
     case DISPLAY_NAME_ONLY: eventTitle = courseInfo.title; break;
-    case DISPLAY_CODE_AND_SECTION: eventTitle = courseInfo.id + ' ' + sectionName; break;
-    case DISPLAY_NAME_AND_SECTION: eventTitle = courseInfo.title + ' ' + sectionName; break;
+    case DISPLAY_CODE_AND_SECTION: eventTitle = courseInfo.id + (skipSectionName ? '' : (' ' + sectionName)); break;
+    case DISPLAY_NAME_AND_SECTION: eventTitle = courseInfo.title + (skipSectionName ? '' : (' ' + sectionName)); break;
     }
     for (var i = 0; i < sectionInfo.days.length; i++) {
       var day = sectionInfo.days[i];
       var startTime = moment(sectionInfo.begin, 'h:mmA');
       var endTime = moment(sectionInfo.end, 'h:mmA');
       var duration = endTime.diff(startTime);
-      console.log(`${eventTitle} on ${day} starting ${firstDays[day]} durating ${duration/60000} minutes repeating weekly until ${settingsApp.settings.period_end}`);
+      var startDate = firstDaysFull[day];
+      var endDate = settingsApp.settings.period_end;
+      if (sectionName.indexOf('Lecture') < 0) {
+        /* probably a recitation, so check if there are numbers in here */
+        var secNbr = sectionName.match(/[0-9]/);
+        if (secNbr && secNbr.length == 1) {
+          /* definitely a mini (there's numbers in the name) */
+          if (secNbr[0] == '1') {
+            /* first half, so adjust the end date */
+            endDate = SEMESTER_HALF_END;
+          } else {
+            /* second half, so adjust the start date */
+            startDate = firstDaysHalf[day];
+          }
+        }
+      }
+      console.log(`${eventTitle} on ${day} starting ${startDate} durating ${duration/60000} minutes repeating weekly until ${endDate}`);
       var baseEvent = new node_cal.CalEvent(
         eventTitle,
-        firstDays[day],
-        settingsApp.settings.period_end,
+        startDate,
+        endDate,
         settingsApp.settings.alarms,
         null,
         sectionInfo.room
@@ -220,13 +250,15 @@ function repeatWeeklyWithBreaks(startDate, date) {
       var course = mainApp.courses[i];
       var selectedLectureTimes = course.hasLectures ? course.lectures[course.pickl] : [];
       var selectedRecitationTimes = course.hasRecitations ? course.recitations[course.pickr] : [];
+      var onlyHasOneMtg = (countKeys(course.lectures) + countKeys(course.recitations)) == 1;
+      onlyHasOneMtg = onlyHasOneMtg && settingsApp.settings.hideExtraneousSectionCode;
 
       for (var j = 0; j < selectedLectureTimes.length; j++) {
-        addEventToCalendar(mainCal, course, 'Lecture', selectedLectureTimes[j]);
+        addEventToCalendar(mainCal, course, 'Lecture', selectedLectureTimes[j], onlyHasOneMtg);
       }
 
       for (var j = 0; j < selectedRecitationTimes.length; j++) {
-        addEventToCalendar(mainCal, course, course.pickr, selectedRecitationTimes[j]);
+        addEventToCalendar(mainCal, course, course.pickr, selectedRecitationTimes[j], onlyHasOneMtg);
       }
     }
 
