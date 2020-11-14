@@ -1,27 +1,15 @@
-/* global Vue, node_cal, M, fetch, moment */
+/* global Vue, node_cal, M, fetch, moment, URLSearchParams */
 // TODO: consider a better way for searching
 
-const SEMESTER = 'Fall 2020';
-const SEMESTER_START = new Date(2020, 7, 31); // january = 0
-const SEMESTER_HALF_END = new Date(2020, 9, 19); // march = 2
-const SEMESTER_HALF_START = new Date(2020, 9, 26);
-const SEMESTER_END = new Date(2020, 11, 11); // may = 4
-const SEMESTER_BREAKS = [ // ... vice versa for all dates
-  new Date(2020, 8, 7),
-  new Date(2020, 9, 16),
-  new Date(2020, 9, 23),
-  new Date(2020, 10, 25),
-  new Date(2020, 10, 26),
-  new Date(2020, 10, 27),
-];
+const DEFAULT_SEMESTER = 'F2020';
+
+let cfg = {};
 
 const DISPLAY_CODE_ONLY = 0;
 const DISPLAY_NAME_AND_CODE = 1;
 const DISPLAY_NAME_ONLY = 2;
 const DISPLAY_CODE_AND_SECTION = 3;
 const DISPLAY_NAME_AND_SECTION = 4;
-
-const SOC_JSON = 'data/courses.json';
 
 function fetchFirstDays(startDate, startTime) {
   var firstDays = {};
@@ -70,14 +58,56 @@ function repeatWeeklyWithBreaks(startDate, date) {
   if (diffDays % 7 == 0) {
     // check if the day is a break
     var myStr = date.toDateString();
-    for (var i = 0; i < SEMESTER_BREAKS.length; i++) {
-      if (SEMESTER_BREAKS[i].toDateString() === myStr) return false;
+    for (var i = 0; i < cfg.SEMESTER_BREAKS.length; i++) {
+      if (cfg.SEMESTER_BREAKS[i].toDateString() === myStr) return false;
     }
     return true;
   } else return false;
 }
 
 (function() {
+  // fetch config
+  const urlParams = new URLSearchParams(window.location.search);
+  const cfgSem = urlParams.get('semester') || DEFAULT_SEMESTER;
+  console.log('Fetching data for', cfgSem);
+
+  fetch('data/'+cfgSem+'.json').then(function(resp) {
+    if (!resp.ok) throw new Error(resp.status);
+    return resp.json();
+  }).then(function (fcfg) {
+    document.getElementById('msg').innerHTML = 'Download a calendar containing all of your ' + fcfg["SEMESTER_NAME"] + ' courses here!';
+    document.getElementById('courseInput').disabled = false;
+    document.getElementById('mainApp').style.display = 'block';
+    let jsonDate2Date = (a) => new Date(a[0], a[1], a[2]);
+
+    for (var key in fcfg) {
+      if (fcfg[key].constructor === Array) {
+        /* we know it's an array, but it could be an array of dates, or a single date */
+        if (fcfg[key][0].constructor === Array) {
+          /* it's an array of dates */
+          cfg[key] = [];
+          for (var i = 0; i < fcfg[key].length; i++) {
+            cfg[key].push(jsonDate2Date(fcfg[key][i]));
+          }
+        } else if (fcfg[key].length == 3) {
+          /* it's just a date by itself */
+          cfg[key] = jsonDate2Date(fcfg[key]);
+        } else {
+          throw new Error('Invalid JSON format');
+        }
+      } else {
+        cfg[key] = fcfg[key];
+      }
+    }
+    mainInit();
+  }).catch(function (err) {
+    M.toast({html: 'Error fetching app configuration: ' + err});
+    document.getElementById('msg').innerHTML = 'Failed to fetch courses!';
+    console.error('oopsies', err);
+  });
+})(this);
+
+let mainInit = function() {
   // course input textbox
   var courseInput = document.getElementById('courseInput');
   var downloadBtn = document.getElementById('downloadBtn');
@@ -98,8 +128,7 @@ function repeatWeeklyWithBreaks(startDate, date) {
   var mainApp = new Vue({
     el: '#mainApp',
     data: {
-      courses: [],
-      semester_name: SEMESTER
+      courses: []
     }, methods: {
       addCourse: function(course) {
         courseInput.value = '';
@@ -165,13 +194,13 @@ function repeatWeeklyWithBreaks(startDate, date) {
       alarmsTimeout: null,
       settings: {
         alarms: [600], // 600 seconds = 10 minutes before
-        period_start: SEMESTER_START,
-        period_half_end: SEMESTER_HALF_END,
-        period_half_start: SEMESTER_HALF_START,
-        period_end: SEMESTER_END,
+        period_start: cfg.SEMESTER_START,
+        period_half_end: cfg.SEMESTER_HALF_END,
+        period_half_start: cfg.SEMESTER_HALF_START,
+        period_end: cfg.SEMESTER_END,
         hideExtraneousSectionCode: true,
         displayStyle: DISPLAY_CODE_AND_SECTION,
-        socLocation: SOC_JSON
+        socLocation: cfg.SOC_JSON
       }
     }, methods: {
       updateRawAlarms: function() {
@@ -191,7 +220,7 @@ function repeatWeeklyWithBreaks(startDate, date) {
   var addEventToCalendar = function(calendar, courseInfo, sectionName, sectionInfo, skipSectionName) {
     var eventTitle;
     var firstDaysFull = fetchFirstDays(settingsApp.settings.period_start, sectionInfo.begin);
-    var firstDaysHalf = fetchFirstDays(SEMESTER_HALF_START, sectionInfo.begin);
+    var firstDaysHalf = fetchFirstDays(cfg.SEMESTER_HALF_START, sectionInfo.begin);
 
     /* do the padding for sectionName here since it might be blank */
     switch (settingsApp.settings.displayStyle) {
@@ -215,7 +244,7 @@ function repeatWeeklyWithBreaks(startDate, date) {
           /* definitely a mini (there's numbers in the name) */
           if (secNbr[0] == '1') {
             /* first half, so adjust the end date */
-            endDate = SEMESTER_HALF_END;
+            endDate = cfg.SEMESTER_HALF_END;
           } else {
             /* second half, so adjust the start date */
             startDate = firstDaysHalf[day];
@@ -243,7 +272,7 @@ function repeatWeeklyWithBreaks(startDate, date) {
   downloadBtn.addEventListener('click', function(e) {
     if (mainApp.courses.length == 0) return;
     // this will use node-cal to set up all of the classes, and then generate a blob to download
-    var mainCal = new node_cal.Calendar('Courses', 'Course schedule for the ' + SEMESTER + ' semester.');
+    var mainCal = new node_cal.Calendar('Courses', 'Course schedule for the ' + cfg.SEMESTER_NAME + ' semester.');
 
     // loop through all courses
     for (var i = 0; i < mainApp.courses.length; i++) {
@@ -270,21 +299,16 @@ function repeatWeeklyWithBreaks(startDate, date) {
   // fetch the course json
   var updateSoc = function() {
     fetch(settingsApp.settings.socLocation).then(function(resp) {
-      if (resp.status !== 200) {
-        M.toast({html: 'Error fetching course JSON: ' + resp.status});
-        return;
+      if (!resp.ok) throw new Error(resp.status);
+      return resp.json();
+    }).then(function(data) {
+      courseData = data;
+      var courseArray = [];
+      for (var courseNum in courseData) {
+        courseArray.push(courseNum);
       }
-
-      // convert to json
-      resp.json().then(function(data) {
-        courseData = data;
-        var courseArray = [];
-        for (var courseNum in courseData) {
-          courseArray.push(courseNum);
-        }
-        // Set up autocomplete
-        autocomplete(courseInput, courseArray, mainApp.addCourse);
-      });
+      // Set up autocomplete
+      autocomplete(courseInput, courseArray, mainApp.addCourse);
     }).catch(function(err) {
       M.toast({html: 'Error fetching course JSON: ' + err});
     });
@@ -295,7 +319,7 @@ function repeatWeeklyWithBreaks(startDate, date) {
   // debug
   this.mainApp = mainApp;
   this.settingsApp = settingsApp;
-})(this);
+};
 
 /* code from https://www.w3schools.com/howto/howto_js_autocomplete.asp */
 function autocomplete(inp, arr, callback) {

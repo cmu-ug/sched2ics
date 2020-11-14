@@ -106,3 +106,7 @@ label {
 .select-wrapper input.select-dropdown:focus {
   border-bottom: 1px solid #ff9800;
 }
+
+#mainApp {
+  display: none;
+}
