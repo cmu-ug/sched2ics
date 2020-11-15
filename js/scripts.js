@@ -1,7 +1,7 @@
 /* global Vue, node_cal, M, fetch, moment, URLSearchParams */
 // TODO: consider a better way for searching
 
-const DEFAULT_SEMESTER = 'F2020';
+const DEFAULT_SEMESTER = 'S2021';
 
 let cfg = {};
 
@@ -242,7 +242,7 @@ let mainInit = function() {
         var secNbr = sectionName.match(/[0-9]/);
         if (secNbr && secNbr.length == 1) {
           /* definitely a mini (there's numbers in the name) */
-          if (secNbr[0] == '1') {
+          if (secNbr[0] == '1' || secNbr[0] == '3') {
             /* first half, so adjust the end date */
             endDate = cfg.SEMESTER_HALF_END;
           } else {
