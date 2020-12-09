@@ -1,7 +1,7 @@
 /* global Vue, node_cal, M, fetch, moment, URLSearchParams */
 // TODO: consider a better way for searching
 
-const DEFAULT_SEMESTER = 'S2021';
+const DEFAULT_SEMESTER = 'F2020';
 
 let cfg = {};
 
@@ -11,9 +11,11 @@ const DISPLAY_NAME_ONLY = 2;
 const DISPLAY_CODE_AND_SECTION = 3;
 const DISPLAY_NAME_AND_SECTION = 4;
 
+const DAYS = 'UMTWRFS';
+
 function fetchFirstDays(startDate, startTime) {
   var firstDays = {};
-  var days = 'UMTWRFS';
+
   var dateStr = '';
   dateStr += startDate.getFullYear() + ' ' + (startDate.getMonth()+1) + ' ' + startDate.getDate();
   dateStr += ' ' + startTime;
@@ -21,7 +23,7 @@ function fetchFirstDays(startDate, startTime) {
 
   for (var i = 0; i < 7; i++) {
     var tempDateTwo = baseDate.toDate();
-    firstDays[days[tempDateTwo.getDay()]] = tempDateTwo;
+    firstDays[DAYS[tempDateTwo.getDay()]] = tempDateTwo;
     baseDate.add(1, 'days');
   }
 
@@ -123,6 +125,9 @@ let mainInit = function() {
   setTimeout(function() {
     M.FormSelect.init(document.querySelectorAll('select'));
   }, 100);
+
+  // init visual calendar
+  initializeVisualCalendars();
 
   // initialize the vue app
   var mainApp = new Vue({
@@ -265,6 +270,7 @@ let mainInit = function() {
         duration,
         repeatWeeklyWithBreaks
       ));
+      addEventToVisualCalendar(eventTitle, day, startTime, endTime);
     }
   };
 
@@ -273,6 +279,8 @@ let mainInit = function() {
     if (mainApp.courses.length == 0) return;
     // this will use node-cal to set up all of the classes, and then generate a blob to download
     var mainCal = new node_cal.Calendar('Courses', 'Course schedule for the ' + cfg.SEMESTER_NAME + ' semester.');
+    // reset visual calendars
+    resetVisualCalendars();
 
     // loop through all courses
     for (var i = 0; i < mainApp.courses.length; i++) {
@@ -294,6 +302,9 @@ let mainInit = function() {
     // calendar all done, time to convert to string
     var calStr = mainCal.toICal();
     downloadString('text/calendar', 'courses.ics', calStr);
+
+    // draw the visual calendar again
+    redrawVisualCalendars();
   });
 
   // fetch the course json
@@ -422,3 +433,172 @@ document.addEventListener('click', function (e) {
   closeAllLists(e.target);
 });
 }
+
+/* visual calendar
+ * adapted from https://www.cssscript.com/day-view-calendar-vanilla-javascript/
+ */
+const minutesinDay = 60 * 13;
+/* lol, like the pun? this is the resolution time step of conflicts */
+const conflictResolution = 10;
+const dayStart = '9:00AM';
+function VisualCalendar(boundElem) {
+  this.boundElem = boundElem;
+  this.events = [];
+  this.collisions = [];
+  this.width = [];
+  this.leftOffSet = [];
+  this.containerHeight = this.boundElem.clientHeight;
+  this.containerWidth = this.boundElem.clientWidth;
+
+  this._recomputeCollisions = function() {
+    this.collisions = [];
+
+    for (var i = 0; i < minutesinDay / conflictResolution; i ++) {
+      var time = [];
+      for (var j = 0; j < this.events.length; j++) {
+        time.push(0);
+      }
+      this.collisions.push(time);
+    }
+
+    this.events.forEach((event, id) => {
+      let end = event.end;
+      let start = event.start;
+      let order = 1;
+      let timeIndex;
+
+      while (start < end) {
+        timeIndex = Math.floor(start / conflictResolution);
+
+        while (order < this.events.length) {
+          if (this.collisions[timeIndex].indexOf(order) === -1) {
+            break;
+          }
+          order++;
+        }
+
+        this.collisions[timeIndex][id] = order;
+        start = start + conflictResolution;
+      }
+
+      this.collisions[Math.floor((end-1)/conflictResolution)][id] = order;
+  });
+  };
+
+  this._recomputeAttributes = function() {
+    //resets storage
+    this.width = [];
+    this.leftOffSet = [];
+
+    for (var i = 0; i < this.events.length; i++) {
+      this.width.push(0);
+      this.leftOffSet.push(0);
+    }
+
+    this.collisions.forEach((period) => {
+      // number of events in that period
+      let count = period.reduce((a,b) => {
+        return b ? a + 1 : a;
+      }, 0);
+
+      if (count > 1) {
+        period.forEach((event, id) => {
+          // max number of events it is sharing a time period with determines width
+          if (period[id]) {
+            if (count > this.width[id]) {
+              this.width[id] = count;
+            }
+          }
+
+          if (period[id] && !this.leftOffSet[id]) {
+            this.leftOffSet[id] = period[id];
+          }
+        });
+      }
+    });
+  };
+
+  this._createDomElement = function(event, height, top, left, units) {
+    let node = document.createElement('div');
+    node.className = 'event';
+    node.innerHTML = "<span class='title'>" + event.label + "</span>";
+
+    // Customized CSS to position each event
+    node.style.width = (this.containerWidth/units) + 'px';
+    node.style.height = height + 'px';
+    node.style.top = top + 'px';
+    node.style.left = left + 'px';
+
+    this.boundElem.appendChild(node);
+  };
+
+  this.layoutElements = function() {
+    this.boundElem.innerHTML = '';
+
+    this._recomputeCollisions();
+    this._recomputeAttributes();
+
+    this.events.forEach((event, id) => {
+      let height = (event.end - event.start) / minutesinDay * this.containerHeight;
+      let top = event.start / minutesinDay * this.containerHeight;
+      let units = this.width[id];
+      if (units == 0) units = 1;
+      let left = (this.containerWidth / this.width[id]) * (this.leftOffSet[id] - 1);
+      if (!left || left < 0) left = 0;
+      this._createDomElement(event, height, top, left, units);
+    });
+  };
+
+  this.addEvent = function(label, start, end) {
+    this.events.push({
+      label: label,
+      start: start,
+      end: end
+    });
+  };
+}
+
+let visualCalendars = [];
+let daysMapping = {};
+
+let initializeVisualCalendars = function() {
+  for (var i = 0; i < DAYS.length; i++) {
+    let container = document.getElementById('events-' + DAYS[i]);
+    if (container) {
+      visualCalendars.push(new VisualCalendar(container));
+    } else {
+      visualCalendars.push(null);
+    }
+
+    daysMapping[DAYS[i]] = i;
+  }
+};
+
+let resetVisualCalendars = function() {
+  for (var i = 0; i < DAYS.length; i++) {
+    if (visualCalendars[i]) {
+      visualCalendars[i].events = [];
+    }
+  }
+
+  redrawVisualCalendars();
+};
+
+let redrawVisualCalendars = function() {
+  for (var i = 0; i < DAYS.length; i++) {
+    if (visualCalendars[i]) {
+      visualCalendars[i].layoutElements();
+    }
+  }
+};
+
+let addEventToVisualCalendar = function(label, day, start, end) {
+  let baseTime = moment(dayStart, 'h:mmA');
+
+  var startMinute = start.diff(baseTime) / 60000;
+  var endMinute = end.diff(baseTime) / 60000;
+
+  let visualCalendar = visualCalendars[daysMapping[day]];
+  if (visualCalendar)
+    visualCalendar.addEvent(label, startMinute, endMinute);
+};
