@@ -26,13 +26,14 @@
         <div class="card-content">
           <div class="card-title" style="display: flex;">
             <div>{{course.id}} -&nbsp;</div>
-            <input type="text" class="card-editable browser-default" v-model="course.title"></div>
+            <input type="text" class="card-editable browser-default" v-model="course.title" v-on:blur="updateSelection">
+          </div>
           <div class="row">
             <div class="col s6" v-if="course.hasLectures">
               <b>Lectures</b>
               <p v-for="(meetings,key) in course.lectures">
                 <label>
-                  <input class="with-gap" v-bind:name="course.idl" :value="key" type="radio" v-model="course.pickl" />
+                  <input class="with-gap" v-bind:name="course.idl" :value="key" type="radio" v-model="course.pickl" v-on:change="updateSelection" />
                   <span>
                     {{ key }}:
                     <span v-for="meeting,idx in course.lectures[key]">
@@ -47,7 +48,7 @@
               <b>Recitations</b>
               <p v-for="(meetings,key) in course.recitations">
                 <label>
-                  <input class="with-gap" v-bind:name="course.idr" :value="key" type="radio" v-model="course.pickr" />
+                  <input class="with-gap" v-bind:name="course.idr" :value="key" type="radio" v-model="course.pickr" v-on:change="updateSelection" />
                   <span>
                     {{ key }}:
                     <span v-for="meeting,idx in meetings">
@@ -68,10 +69,11 @@
   <div class="section">
     <div class="container">
       <h3 class="header center orange-text">Schedule Preview</h3>
-      <p class="center">Updates when you press the "Download Schedule" button.</p>
       <br />
       <div class="timings-container">
         <div class="timings">
+          <div><span>8:00 </span>AM</div>
+          <div>8:30</div>
           <div><span>9:00 </span>AM</div>
           <div>9:30</div>
           <div><span>10:00 </span>AM</div>
@@ -126,9 +128,10 @@
         <div class="col s12">
           <ol>
             <li>Set alarms/notifications for classes whenever you want</li>
-            <li>Each session is its own event (this is sometimes more useful and sometimes not)</li>
+            <li>Each session is its own event (this is sometimes more useful (e.g. if you want to remove a single event) and sometimes not (e.g. if you drop a class))</li>
             <li>Rename calendar events</li>
-            <li>View past course offering days and times</li>
+            <li>View past course offering days and times (change the <code>?semester=</code> variable)</li>
+            <li>Preview how events will look in your calendar</li>
           </ol>
         </div>
       </div>

@@ -109,6 +109,7 @@ function repeatWeeklyWithBreaks(startDate, date) {
   });
 })(this);
 
+const SETTINGS_APP_KEY = 'USER_PREFS';
 let mainInit = function() {
   // course input textbox
   var courseInput = document.getElementById('courseInput');
@@ -119,7 +120,12 @@ let mainInit = function() {
   M.FloatingActionButton.init(document.querySelectorAll('.fixed-action-btn'));
 
   // init modals
-  M.Modal.init(document.querySelectorAll('.modal'));
+  M.Modal.init(document.querySelectorAll('.modal'), {
+    onCloseEnd: function() {
+      mainApp.updateSelection();
+      settingsApp.commit();
+    }
+  });
 
   // init forms
   setTimeout(function() {
@@ -133,7 +139,8 @@ let mainInit = function() {
   var mainApp = new Vue({
     el: '#mainApp',
     data: {
-      courses: []
+      courses: [],
+      mainCal: null
     }, methods: {
       addCourse: function(course) {
         courseInput.value = '';
@@ -188,6 +195,34 @@ let mainInit = function() {
           pickr: firstR,
           units: courseData[course][0].units
         });
+        this.updateSelection();
+      },
+      updateSelection: function() {
+        if (this.courses.length == 0) return;
+        // this will use node-cal to set up all of the classes, and then generate a blob to download
+        this.mainCal = new node_cal.Calendar('Courses', 'Course schedule for the ' + cfg.SEMESTER_NAME + ' semester.');
+        // reset visual calendars
+        resetVisualCalendars();
+
+        // loop through all courses
+        for (var i = 0; i < mainApp.courses.length; i++) {
+          var course = mainApp.courses[i];
+          var selectedLectureTimes = course.hasLectures ? course.lectures[course.pickl] : [];
+          var selectedRecitationTimes = course.hasRecitations ? course.recitations[course.pickr] : [];
+          var onlyHasOneMtg = (countKeys(course.lectures) + countKeys(course.recitations)) == 1;
+          onlyHasOneMtg = onlyHasOneMtg && settingsApp.settings.hideExtraneousSectionCode;
+
+          for (var j = 0; j < selectedLectureTimes.length; j++) {
+            addEventToCalendar(this.mainCal, course, 'Lecture', selectedLectureTimes[j], onlyHasOneMtg);
+          }
+
+          for (var j = 0; j < selectedRecitationTimes.length; j++) {
+            addEventToCalendar(this.mainCal, course, course.pickr, selectedRecitationTimes[j], onlyHasOneMtg);
+          }
+        }
+
+        // draw the visual calendar again
+        redrawVisualCalendars();
       }
     }
   });
@@ -217,9 +252,29 @@ let mainInit = function() {
             return parseInt(itm, 10);
           });
         }.bind(this), 100);
+      },
+      commit: function() {
+        window.localStorage.setItem(SETTINGS_APP_KEY, JSON.stringify(this.settings));
+      },
+      load: function() {
+        let ls = window.localStorage.getItem(SETTINGS_APP_KEY);
+        if (!ls) return;
+        try {
+          ls = JSON.parse(ls);
+        } catch(e) {
+          return;
+        }
+
+        let permittedKeys = ['hideExtraneousSectionCode', 'displayStyle', 'alarms'];
+        for (var key in this.settings) {
+          if (key in ls && permittedKeys.includes(key)) {
+            this.settings[key] = ls[key];
+          }
+        }
       }
     }
   });
+  settingsApp.load();
   settingsApp.alarmsRaw = settingsApp.settings.alarms.join(",");
 
   var addEventToCalendar = function(calendar, courseInfo, sectionName, sectionInfo, skipSectionName) {
@@ -276,35 +331,9 @@ let mainInit = function() {
 
   // set up the fab download button
   downloadBtn.addEventListener('click', function(e) {
-    if (mainApp.courses.length == 0) return;
-    // this will use node-cal to set up all of the classes, and then generate a blob to download
-    var mainCal = new node_cal.Calendar('Courses', 'Course schedule for the ' + cfg.SEMESTER_NAME + ' semester.');
-    // reset visual calendars
-    resetVisualCalendars();
-
-    // loop through all courses
-    for (var i = 0; i < mainApp.courses.length; i++) {
-      var course = mainApp.courses[i];
-      var selectedLectureTimes = course.hasLectures ? course.lectures[course.pickl] : [];
-      var selectedRecitationTimes = course.hasRecitations ? course.recitations[course.pickr] : [];
-      var onlyHasOneMtg = (countKeys(course.lectures) + countKeys(course.recitations)) == 1;
-      onlyHasOneMtg = onlyHasOneMtg && settingsApp.settings.hideExtraneousSectionCode;
-
-      for (var j = 0; j < selectedLectureTimes.length; j++) {
-        addEventToCalendar(mainCal, course, 'Lecture', selectedLectureTimes[j], onlyHasOneMtg);
-      }
-
-      for (var j = 0; j < selectedRecitationTimes.length; j++) {
-        addEventToCalendar(mainCal, course, course.pickr, selectedRecitationTimes[j], onlyHasOneMtg);
-      }
-    }
-
     // calendar all done, time to convert to string
-    var calStr = mainCal.toICal();
+    var calStr = mainApp.mainCal.toICal();
     downloadString('text/calendar', 'courses.ics', calStr);
-
-    // draw the visual calendar again
-    redrawVisualCalendars();
   });
 
   // fetch the course json
@@ -437,10 +466,10 @@ document.addEventListener('click', function (e) {
 /* visual calendar
  * adapted from https://www.cssscript.com/day-view-calendar-vanilla-javascript/
  */
-const minutesinDay = 60 * 13;
+const minutesinDay = 60 * 14;
 /* lol, like the pun? this is the resolution time step of conflicts */
 const conflictResolution = 10;
-const dayStart = '9:00AM';
+const dayStart = '8:00AM';
 function VisualCalendar(boundElem) {
   this.boundElem = boundElem;
   this.events = [];
@@ -449,6 +478,17 @@ function VisualCalendar(boundElem) {
   this.leftOffSet = [];
   this.containerHeight = this.boundElem.clientHeight;
   this.containerWidth = this.boundElem.clientWidth;
+
+  this.resizeUpdate = null;
+  window.addEventListener('resize', function() {
+    this.containerHeight = this.boundElem.clientHeight;
+    this.containerWidth = this.boundElem.clientWidth;
+    if (this.resizeUpdate) clearTimeout(this.resizeUpdate);
+    this.resizeUpdate = setTimeout(function() {
+      this.resizeUpdate = null;
+      this.layoutElements();
+    }.bind(this), 100);
+  }.bind(this));
 
   this._recomputeCollisions = function() {
     this.collisions = [];
