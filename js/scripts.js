@@ -77,7 +77,10 @@ function repeatWeeklyWithBreaks(startDate, date) {
     if (!resp.ok) throw new Error(resp.status);
     return resp.json();
   }).then(function (fcfg) {
-    document.getElementById('msg').innerHTML = 'Download a calendar containing all of your ' + fcfg["SEMESTER_NAME"] + ' courses here!';
+    document.title += ' - ' + fcfg["SEMESTER_NAME"];
+    document.getElementById('msg').innerHTML = ('DUMMY' in fcfg) ?
+        'Preview past courses in ' + fcfg["SEMESTER_NAME"] + ' here!':
+        'Download a calendar containing all of your ' + fcfg["SEMESTER_NAME"] + ' courses here!';
     document.getElementById('courseInput').disabled = false;
     document.getElementById('mainApp').style.display = 'block';
     let jsonDate2Date = (a) => new Date(a[0], a[1], a[2]);
@@ -198,7 +201,6 @@ let mainInit = function() {
         this.updateSelection();
       },
       updateSelection: function() {
-        if (this.courses.length == 0) return;
         // this will use node-cal to set up all of the classes, and then generate a blob to download
         this.mainCal = new node_cal.Calendar('Courses', 'Course schedule for the ' + cfg.SEMESTER_NAME + ' semester.');
         // reset visual calendars
@@ -223,6 +225,21 @@ let mainInit = function() {
 
         // draw the visual calendar again
         redrawVisualCalendars();
+
+        // check download btn enable
+        if (mainApp.courses.length > 0) {
+          if ((!(downloadBtn.classList.contains('blue'))) && (!('DUMMY' in cfg))) {
+            downloadBtn.classList.remove('grey');
+            downloadBtn.classList.add('blue');
+            downloadBtn.classList.add('waves-effect');
+          }
+        } else {
+          if (!(downloadBtn.classList.contains('grey'))) {
+            downloadBtn.classList.add('grey');
+            downloadBtn.classList.remove('blue');
+            downloadBtn.classList.remove('waves-effect');
+          }
+        }
       }
     }
   });
@@ -240,7 +257,8 @@ let mainInit = function() {
         period_end: cfg.SEMESTER_END,
         hideExtraneousSectionCode: true,
         displayStyle: DISPLAY_CODE_AND_SECTION,
-        socLocation: cfg.SOC_JSON
+        socLocation: cfg.SOC_JSON,
+        isDummy: 'DUMMY' in cfg,
       }
     }, methods: {
       updateRawAlarms: function() {
@@ -331,9 +349,14 @@ let mainInit = function() {
 
   // set up the fab download button
   downloadBtn.addEventListener('click', function(e) {
+    if (downloadBtn.classList.contains('grey')) {
+      // cannot download
+      return;
+    }
     // calendar all done, time to convert to string
     var calStr = mainApp.mainCal.toICal();
-    downloadString('text/calendar', 'courses.ics', calStr);
+    if (calStr)
+      downloadString('text/calendar', 'courses.ics', calStr);
   });
 
   // fetch the course json

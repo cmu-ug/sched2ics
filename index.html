@@ -61,7 +61,7 @@
           </div>
         </div>
         <div class="card-action">
-          <a class="red-text pointer-cursor" v-on:click="courses.splice(idx, 1);">Remove</a>
+          <a class="red-text pointer-cursor" v-on:click="courses.splice(idx, 1); updateSelection();">Remove</a>
         </div>
       </div>
     </div>
@@ -165,7 +165,7 @@
   </footer>
 
   <div class="fixed-action-btn">
-    <a class="btn-floating btn-large blue waves-effect" id="downloadBtn">
+    <a class="btn-floating btn-large grey" id="downloadBtn">
       <i class="large material-icons">save_alt</i>
     </a>
     <ul>
@@ -210,10 +210,11 @@
         </div>
         <div class="row">
           <div class="col s12">
-            Start of semester: {{ settings.period_start }} <br />
+            <span v-if="settings.isDummy"><b>Historical data with no semester start/end information</b><br /></span>
+            <span v-if="!settings.isDummy">Start of semester: {{ settings.period_start }} <br />
             End of Mini-1: {{ settings.period_half_end }} <br />
             Start of Mini-2: {{ settings.period_half_start }} <br />
-            End of semester: {{ settings.period_end }} <br />
+            End of semester: {{ settings.period_end }} <br /></span>
             Course information fetched from: {{ settings.socLocation }}
           </div>
         </div>
