@@ -45,7 +45,7 @@
               </p>
             </div>
             <div class="col s6" v-if="course.hasRecitations">
-              <b>Recitations</b>
+              <b>Sections</b>
               <p v-for="(meetings,key) in course.recitations">
                 <label>
                   <input class="with-gap" v-bind:name="course.idr" :value="key" type="radio" v-model="course.pickr" v-on:change="updateSelection" />
@@ -61,8 +61,13 @@
           </div>
         </div>
         <div class="card-action">
+          <a class="left blue-text">Units: {{ course.units }}</a>
+          <a class="left blue-text">FCE: ??</a>
           <a class="red-text pointer-cursor" v-on:click="courses.splice(idx, 1); updateSelection();">Remove</a>
         </div>
+      </div>
+      <div class="right" v-if="courses.length > 0">
+        Total units: {{ unit_total }}
       </div>
     </div>
   </div>

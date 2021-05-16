@@ -241,6 +241,13 @@ let mainInit = function() {
           }
         }
       }
+    },
+    computed: {
+      unit_total: function(){
+      return this.courses.reduce(function(prev, item){
+        return prev + item.units; 
+      }, 0);
+     }
     }
   });
 
