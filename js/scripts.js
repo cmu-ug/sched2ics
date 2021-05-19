@@ -1,9 +1,10 @@
 /* global Vue, node_cal, M, fetch, moment, URLSearchParams */
 // TODO: consider a better way for searching
 
-const DEFAULT_SEMESTER = 'F2020';
+const DEFAULT_SEMESTER = 'F2021';
 
 let cfg = {};
+let fce_hours = {};
 
 const DISPLAY_CODE_ONLY = 0;
 const DISPLAY_NAME_AND_CODE = 1;
@@ -72,6 +73,16 @@ function repeatWeeklyWithBreaks(startDate, date) {
   const urlParams = new URLSearchParams(window.location.search);
   const cfgSem = urlParams.get('semester') || DEFAULT_SEMESTER;
   console.log('Fetching data for', cfgSem);
+
+  fetch('data/fce_hours.json').then(function(resp) {
+    if (!resp.ok) throw new Error(resp.status);
+    return resp.json();
+  }).then(function (fetched_data) {
+    fce_hours = fetched_data;
+  }).catch(function (err) {
+    M.toast({html: 'Error fetching FCE information: ' + err});
+    console.error('oopsies', err);
+  });
 
   fetch('data/'+cfgSem+'.json').then(function(resp) {
     if (!resp.ok) throw new Error(resp.status);
@@ -196,7 +207,8 @@ let mainInit = function() {
           idr: 'r' + course,
           pickl: firstL,
           pickr: firstR,
-          units: courseData[course][0].units
+          units: courseData[course][0].units,
+          fce: (course in fce_hours) ? (fce_hours[course].toFixed(2)) : '???',
         });
         this.updateSelection();
       },
@@ -243,11 +255,23 @@ let mainInit = function() {
       }
     },
     computed: {
-      unit_total: function(){
-      return this.courses.reduce(function(prev, item){
-        return prev + item.units; 
-      }, 0);
-     }
+      unit_total: function() {
+        return this.courses.reduce(function(prev, item) {
+          return prev + item.units; 
+        }, 0);
+      },
+      fce_total: function() {
+        return this.courses.reduce(function(prev, item) {
+          let hrs = parseFloat(item.fce);
+          return prev + (isNaN(hrs) ? 0 : hrs);
+        }, 0).toFixed(2);
+      },
+      fce_ignored: function() {
+        return this.courses.reduce(function(prev, item) {
+          let hrs = parseFloat(item.fce);
+          return prev + (isNaN(hrs) ? 1 : 0); 
+        }, 0);
+      },
     }
   });
 
