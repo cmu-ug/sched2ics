@@ -339,6 +339,10 @@ let mainInit = function() {
     case DISPLAY_CODE_AND_SECTION: eventTitle = courseInfo.id + (skipSectionName ? '' : (' ' + sectionName)); break;
     case DISPLAY_NAME_AND_SECTION: eventTitle = courseInfo.title + (skipSectionName ? '' : (' ' + sectionName)); break;
     }
+    if (sectionInfo.days == 'TBA') {
+      /* skip things that aren't supposed to appear on the calendar */
+      return;
+    }
     for (var i = 0; i < sectionInfo.days.length; i++) {
       var day = sectionInfo.days[i];
       var startTime = moment(sectionInfo.begin, 'h:mmA');
