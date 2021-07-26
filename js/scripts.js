@@ -696,6 +696,12 @@ let addEventToVisualCalendar = function(label, day, start, end) {
   var startMinute = start.diff(baseTime) / 60000;
   var endMinute = end.diff(baseTime) / 60000;
 
+  if (day == 'S' || day == 'U') {
+    // skip saturday and sunday
+    document.getElementById('vcwarn').innerHTML = 'Warning: the Visual Calendar cannot display classes on Saturday/Sunday, but they will show up correctly in a download.<br />';
+    return;
+  }
+
   let visualCalendar = visualCalendars[daysMapping[day]];
   if (visualCalendar)
     visualCalendar.addEvent(label, startMinute, endMinute);
