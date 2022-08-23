@@ -1,7 +1,7 @@
 /* global Vue, node_cal, M, fetch, moment, URLSearchParams */
 // TODO: consider a better way for searching
 
-const DEFAULT_SEMESTER = 'F2021';
+const DEFAULT_SEMESTER = 'F2022';
 
 let cfg = {};
 let fce_hours = {};
